@@ -93,16 +93,70 @@ jobs:
 
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          # Pass secrets as environment variables to the SSH action
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          CELERY_CONCURRENCY: ${{ secrets.CELERY_CONCURRENCY }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DB_USER,DB_PASSWORD,DB_NAME,DATABASE_URL,SESSION_SECRET,CELERY_CONCURRENCY
           script: |
             # Navigate to app directory
             cd /home/${{ secrets.EC2_USER }}/email-scraper
 
             # Pull latest code
             git pull origin main
+
+            # =================================================================
+            # CREATE .env FILE FROM GITHUB SECRETS
+            # =================================================================
+            # This creates the .env file on the server using GitHub Secrets
+            # The .env file is NOT stored in git for security reasons
+            # =================================================================
+            cat > .env << 'ENVFILE'
+            # ===========================================
+            # Database Configuration
+            # ===========================================
+            DB_USER=${DB_USER:-postgres}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_NAME=${DB_NAME:-email_scraper}
+            DATABASE_URL=${DATABASE_URL:-postgresql://postgres:${DB_PASSWORD}@db:5432/email_scraper}
+
+            # ===========================================
+            # Redis Configuration
+            # ===========================================
+            REDIS_URL=redis://redis:6379/0
+
+            # ===========================================
+            # Security
+            # ===========================================
+            SESSION_SECRET=${SESSION_SECRET}
+            SESSION_COOKIE_SECURE=true
+            PREFERRED_URL_SCHEME=https
+
+            # ===========================================
+            # Production Settings
+            # ===========================================
+            FLASK_DEBUG=false
+            PROXY_FIX=true
+            PLAYWRIGHT_FALLBACK=true
+
+            # ===========================================
+            # Celery
+            # ===========================================
+            CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-4}
+            ENVFILE
+
+            # Substitute environment variables in the .env file
+            envsubst < .env > .env.tmp && mv .env.tmp .env
+
+            echo "✅ .env file created from GitHub Secrets"
 
             # Pull latest Docker images
             docker-compose pull
@@ -116,7 +170,7 @@ jobs:
             # Show status
             docker-compose ps
 
-            echo "Deployment completed successfully!"
+            echo "✅ Deployment completed successfully!"
 
   # ===========================================================================
   # Job 4: Notify (Optional)
