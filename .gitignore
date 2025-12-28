@@ -1,0 +1,123 @@
+# ===========================================
+# Python
+# ===========================================
+.pythonlibs/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ===========================================
+# Environment & Secrets (NEVER COMMIT!)
+# ===========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+ssl/
+
+# ===========================================
+# IDE & Editors
+# ===========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-*
+.project
+.pydevproject
+.settings/
+
+# ===========================================
+# OS Files
+# ===========================================
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===========================================
+# Logs & Databases
+# ===========================================
+*.log
+logs/
+*.db
+*.sqlite
+*.sqlite3
+
+# ===========================================
+# Testing
+# ===========================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# ===========================================
+# Local Development
+# ===========================================
+instance/
+.local/
+.config/
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# ===========================================
+# Docker (local volumes)
+# ===========================================
+docker-data/
+postgres_data/
+redis_data/
+
+# ===========================================
+# Node (if any frontend)
+# ===========================================
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ===========================================
+# Redis binaries (Windows)
+# ===========================================
+redis/
+
+# ===========================================
+# Flower database
+# ===========================================
+flower.db.*
+
+# ===========================================
+# Claude Code
+# ===========================================
+.claude/

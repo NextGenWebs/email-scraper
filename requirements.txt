@@ -1,0 +1,33 @@
+# Core Flask framework
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-Limiter==3.5.0
+Werkzeug==3.0.1
+
+# Database
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Redis & Celery Job Queue
+redis==5.0.1
+celery[redis]==5.3.6
+flower==2.0.1
+
+# Web scraping
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==5.1.0
+playwright==1.49.1
+
+# Data processing (for compatibility - will refactor streaming exports)
+pandas==2.1.3
+openpyxl==3.1.2
+
+# Production WSGI servers
+waitress==2.1.2  # Windows-friendly
+gunicorn==21.2.0  # Linux production
+
+# Utilities
+python-dotenv==1.0.0
+psutil==5.9.8  # System monitoring

@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Projects - Email Scraper{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    {% include '_sidebar.html' %}
+    
+    <main class="main-content">
+        <div class="content-header">
+            <h1>Projects</h1>
+            <div>
+                <button class="btn btn-danger" id="bulkDeleteBtn" onclick="bulkDeleteProjects()" style="display: none; margin-right: 10px;">
+                    <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+                </button>
+                <button class="btn btn-primary" onclick="showNewProjectModal()">
+                    <i class="fas fa-plus"></i> New Project
+                </button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>All Projects</h2>
+                <label style="cursor: pointer; user-select: none;">
+                    <input type="checkbox" id="selectAllProjects" onchange="toggleSelectAll(this)"> Select All
+                </label>
+            </div>
+            <div class="card-body">
+                <div id="projectsList">
+                    {% for project in projects %}
+                    <div class="project-item" id="project-{{ project.id }}">
+                        <div class="project-header">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <input type="checkbox" class="project-checkbox" data-project-id="{{ project.id }}" onchange="updateBulkDeleteButton()">
+                                <div>
+                                    <h3>{{ project.name }}</h3>
+                                    <span class="badge badge-{{ project.status }}">{{ project.status|capitalize }}</span>
+                                </div>
+                            </div>
+                            <div class="project-actions">
+                                <button class="btn btn-sm btn-secondary" onclick="refreshProject({{ project.id }})">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                                {% if project.status == 'running' %}
+                                    {% if project.paused %}
+                                    <button class="btn btn-sm btn-warning" onclick="resumeProject({{ project.id }})">
+                                        <i class="fas fa-play"></i> Resume
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-warning" onclick="pauseProject({{ project.id }})">
+                                        <i class="fas fa-pause"></i> Pause
+                                    </button>
+                                    {% endif %}
+                                {% endif %}
+                                <button class="btn btn-sm btn-primary" onclick="viewResults({{ project.id }})">
+                                    <i class="fas fa-eye"></i> View Results
+                                </button>
+                                <button class="btn btn-sm btn-success" onclick="exportData({{ project.id }}, 'csv')">
+                                    <i class="fas fa-file-csv"></i> CSV
+                                </button>
+                                <button class="btn btn-sm btn-success" onclick="exportData({{ project.id }}, 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteProject({{ project.id }})">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="project-stats">
+                            <div class="stat">
+                                <span class="stat-label">Progress:</span>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: {{ project.progress }}%;" id="progress-{{ project.id }}"></div>
+                                    <span class="progress-text" id="progress-text-{{ project.id }}">
+                                        {{ project.processed_urls|number_format }} of {{ project.total_urls|number_format }} ({{ project.progress }}%)
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">URLs Processed:</span>
+                                <span id="processed-{{ project.id }}">{{ project.processed_urls|number_format }} / {{ project.total_urls|number_format }}</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Emails Found:</span>
+                                <span id="emails-{{ project.id }}">{{ project.emails_found }}</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Created:</span>
+                                <span>{{ project.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                        </div>
+                        
+                        <div id="results-{{ project.id }}" class="project-results" style="display: none;">
+                            <h4>Scraped Data</h4>
+                            <div class="table-responsive">
+                                <table class="data-table results-table" id="table-{{ project.id }}">
+                                    <thead>
+                                        <tr>
+                                            <th>Domain</th>
+                                            <th>Emails</th>
+                                            <th>Social Media</th>
+                                            <th>Contact</th>
+                                            <th>Links</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            <div class="pagination-controls" id="pagination-{{ project.id }}">
+                                <button class="btn btn-sm btn-secondary" onclick="loadResultsPage({{ project.id }}, 'prev')" id="prev-{{ project.id }}">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </button>
+                                <span class="pagination-info" id="page-info-{{ project.id }}">Page 1 of 1</span>
+                                <button class="btn btn-sm btn-secondary" onclick="loadResultsPage({{ project.id }}, 'next')" id="next-{{ project.id }}">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-folder-open"></i>
+                        <p>No projects yet. Create your first project!</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="newProjectModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create New Project</h2>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="newProjectForm" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="projectName">Project Name</label>
+                    <input type="text" id="projectName" name="name" required class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label>Add URLs/Domains</label>
+                    <div class="tab-buttons">
+                        <button type="button" class="tab-btn active" onclick="switchTab('manual')">Manual Entry</button>
+                        <button type="button" class="tab-btn" onclick="switchTab('csv')">Upload CSV</button>
+                    </div>
+                </div>
+                
+                <div id="manualTab" class="tab-content active">
+                    <div class="form-group">
+                        <label for="urls">Enter URLs (one per line)</label>
+                        <textarea id="urls" name="urls" rows="8" class="form-control" placeholder="example.com&#10;https://www.example2.com&#10;http://example3.com"></textarea>
+                        <small>You can enter domains with or without http://, https://, or www</small>
+                    </div>
+                </div>
+                
+                <div id="csvTab" class="tab-content">
+                    <div class="form-group">
+                        <label for="csvFile">Upload CSV File</label>
+                        <input type="file" id="csvFile" name="csv_file" accept=".csv" class="form-control">
+                        <small>CSV should contain a column named 'url' or 'domain'</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Project</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/projects.js') }}"></script>
+{% endblock %}

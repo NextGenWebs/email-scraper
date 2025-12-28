@@ -1,0 +1,120 @@
+# =============================================================================
+# Email Scraper - Production with AWS RDS
+# =============================================================================
+# Use this when connecting to AWS RDS instead of Docker PostgreSQL
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Redis (Message Broker & Cache) - Still runs in Docker
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: email_scraper_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Flask Web Application - Connects to RDS
+  # ===========================================================================
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: email_scraper_web
+    restart: unless-stopped
+    environment:
+      # RDS Database URL - Set in .env file
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - SESSION_SECRET=${SESSION_SECRET}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - PREFERRED_URL_SCHEME=${PREFERRED_URL_SCHEME:-https}
+      - PROXY_FIX=true
+      - FLASK_DEBUG=false
+      - PLAYWRIGHT_FALLBACK=true
+    ports:
+      - "5000:5000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===========================================================================
+  # Celery Worker - Scraping Tasks
+  # ===========================================================================
+  celery_scrape:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: email_scraper_celery_scrape
+    restart: unless-stopped
+    command: celery -A celery_app worker -Q scrape --concurrency=${CELERY_CONCURRENCY:-4} --loglevel=info
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - SESSION_SECRET=${SESSION_SECRET}
+      - PLAYWRIGHT_FALLBACK=true
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Celery Worker - Operations Tasks
+  # ===========================================================================
+  celery_ops:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: email_scraper_celery_ops
+    restart: unless-stopped
+    command: celery -A celery_app worker -Q ops --concurrency=2 --loglevel=info
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - SESSION_SECRET=${SESSION_SECRET}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Flower - Celery Monitoring
+  # ===========================================================================
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: email_scraper_flower
+    restart: unless-stopped
+    command: celery -A celery_app flower --port=5555
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery_scrape
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: email_scraper_network

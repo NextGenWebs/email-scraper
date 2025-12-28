@@ -1,0 +1,51 @@
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <i class="fas fa-envelope-open-text"></i>
+        <h3>Email Scraper</h3>
+    </div>
+    
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('views.dashboard') }}" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('views.projects') }}" class="nav-item {% if active_page == 'projects' %}active{% endif %}">
+            <i class="fas fa-folder"></i>
+            <span>Projects</span>
+        </a>
+        <a href="{{ url_for('views.proxies') }}" class="nav-item {% if active_page == 'proxies' %}active{% endif %}">
+            <i class="fas fa-server"></i>
+            <span>Proxies</span>
+        </a>
+        <a href="{{ url_for('views.settings') }}" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
+        </a>
+        
+    {% if current_user.is_authenticated %}
+        <hr style="margin: 10px 15px; border-color: rgba(255,255,255,0.1);">
+        <a href="{{ url_for('views.admin_page') }}" class="nav-item {% if active_page == 'admin' %}active{% endif %}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <i class="fas fa-shield-alt"></i>
+            <span>Admin Panel</span>
+        </a>
+        {% endif %}
+    </nav>
+    
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <i class="fas fa-user-circle"></i>
+            <div>
+                <span style="display: block;">{{ current_user.email }}</span>
+                {% if current_user.is_authenticated %}
+                <small style="color: #ffd700; font-size: 11px;">
+                    <i class="fas fa-crown"></i> Admin
+                </small>
+                {% endif %}
+            </div>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="btn-logout">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
+        </a>
+    </div>
+</aside>

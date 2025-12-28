@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Proxies - Email Scraper{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    {% include '_sidebar.html' %}
+    
+    <main class="main-content">
+        <div class="content-header">
+            <h1>Proxy Management</h1>
+            <div>
+                <button class="btn btn-primary" onclick="showBulkUploadModal()">
+                    <i class="fas fa-upload"></i> Bulk Upload
+                </button>
+                <button class="btn btn-secondary" onclick="showAddProxyModal()">
+                    <i class="fas fa-plus"></i> Add Single
+                </button>
+                <button class="btn btn-success" onclick="activateAllProxies()" title="Activate all offline proxies">
+                    <i class="fas fa-power-off"></i> Activate All
+                </button>
+                <button class="btn btn-info" onclick="testAllProxies()" title="Test all proxies">
+                    <i class="fas fa-check-circle"></i> Test All
+                </button>
+                <button class="btn btn-warning" onclick="bulkExportProxies()">
+                    <i class="fas fa-download"></i> Export Selected
+                </button>
+                <button class="btn btn-danger" onclick="bulkDeleteProxies()">
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>Residential Proxies</h2>
+            </div>
+            <div class="card-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                            <th>Proxy URL</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Last Tested</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="proxiesList">
+                        {% for proxy in proxies %}
+                        <tr id="proxy-{{ proxy.id }}">
+                            <td><input type="checkbox" class="proxy-checkbox" value="{{ proxy.id }}"></td>
+                            <td><code style="font-size: 12px;">{{ proxy.proxy_url[:60] }}{% if proxy.proxy_url|length > 60 %}...{% endif %}</code></td>
+                            <td><span class="badge badge-secondary">{{ proxy.proxy_type|capitalize }}</span></td>
+                            <td>
+                                <span class="badge badge-{{ 'completed' if proxy.is_active else 'pending' }}">
+                                    {{ 'Online' if proxy.is_active else 'Offline' }}
+                                </span>
+                            </td>
+                            <td>{{ proxy.last_tested.strftime('%Y-%m-%d %H:%M') if proxy.last_tested else 'Never' }}</td>
+                            <td>
+                                <button class="btn btn-sm {% if proxy.is_active %}btn-success{% else %}btn-secondary{% endif %}" onclick="toggleProxy({{ proxy.id }})" title="{% if proxy.is_active %}Pause{% else %}Activate{% endif %}">
+                                    <i class="fas fa-{% if proxy.is_active %}pause{% else %}play{% endif %}"></i>
+                                </button>
+                                <button class="btn btn-sm btn-info" onclick="testProxy({{ proxy.id }})" title="Test Proxy">
+                                    <i class="fas fa-check-circle"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteProxy({{ proxy.id }})" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">No proxies added yet. Add your first proxy!</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h2>About Proxies</h2>
+            </div>
+            <div class="card-body">
+                <p>Proxies help you scrape websites without getting blocked. Add residential proxies for better success rates.</p>
+                <h4>Supported Formats:</h4>
+                <ul>
+                    <li><strong>With credentials:</strong> <code>ip:port:username:password</code></li>
+                    <li><strong>Without credentials:</strong> <code>ip:port</code></li>
+                    <li><strong>Full URL:</strong> <code>http://username:password@proxy-server:port</code></li>
+                </ul>
+                <h4>Features:</h4>
+                <ul>
+                    <li>Bulk upload via text paste, CSV file, or TXT file</li>
+                    <li>Automatic duplicate detection</li>
+                    <li>Enable proxy usage in Settings to use your configured proxies</li>
+                    <li>The scraper will rotate through active proxies automatically</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="addProxyModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add Proxy</h2>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="addProxyForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="proxyUrl">Proxy URL</label>
+                    <input type="text" id="proxyUrl" name="proxy_url" required class="form-control" placeholder="http://username:password@proxy-server:port">
+                </div>
+                
+                <div class="form-group">
+                    <label for="proxyType">Proxy Type</label>
+                    <select id="proxyType" name="proxy_type" class="form-control">
+                        <option value="residential">Residential</option>
+                        <option value="datacenter">Datacenter</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Proxy</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="bulkUploadModal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h2>Bulk Upload Proxies</h2>
+            <button class="modal-close" onclick="closeBulkModal()">&times;</button>
+        </div>
+        <form id="bulkUploadForm" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="bulkProxyType">Proxy Type</label>
+                    <select id="bulkProxyType" name="proxy_type" class="form-control">
+                        <option value="residential">Residential</option>
+                        <option value="datacenter">Datacenter</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Upload Method</label>
+                    <div class="tab-buttons">
+                        <button type="button" class="tab-btn active" onclick="switchProxyTab('text')">Paste Text</button>
+                        <button type="button" class="tab-btn" onclick="switchProxyTab('file')">Upload File</button>
+                    </div>
+                </div>
+                
+                <div id="textTab" class="tab-content active">
+                    <div class="form-group">
+                        <label for="proxiesText">Paste Proxies (one per line)</label>
+                        <textarea id="proxiesText" name="proxies_text" rows="12" class="form-control" placeholder="72.1.154.60:7951:username:password&#10;156.237.23.243:5644:username:password&#10;82.26.107.248:7459:username:password"></textarea>
+                        <small>Formats: ip:port:username:password or ip:port or http://username:password@ip:port</small>
+                    </div>
+                </div>
+                
+                <div id="fileTab" class="tab-content">
+                    <div class="form-group">
+                        <label for="proxiesFile">Upload File (CSV or TXT)</label>
+                        <input type="file" id="proxiesFile" name="proxies_file" accept=".csv,.txt" class="form-control">
+                        <small>Upload a CSV or TXT file with one proxy per line</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeBulkModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Upload Proxies</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/proxies.js') }}"></script>
+{% endblock %}

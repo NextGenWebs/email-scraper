@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Email Scraper{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    {% include '_sidebar.html' %}
+    
+    <main class="main-content">
+        <div class="content-header">
+            <h1>Settings</h1>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>Scraping Configuration</h2>
+            </div>
+            <div class="card-body">
+                <form id="settingsForm">
+                    <div class="form-group">
+                        <label for="maxThreads">Maximum Threads</label>
+                        <input type="number" id="maxThreads" name="max_threads" min="1" max="20" value="{{ settings.max_threads }}" class="form-control">
+                        <small>Number of concurrent threads for scraping (1-20). More threads = faster but more resource intensive.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="requestTimeout">Request Timeout (seconds)</label>
+                        <input type="number" id="requestTimeout" name="request_timeout" min="5" max="120" value="{{ settings.request_timeout }}" class="form-control">
+                        <small>How long to wait for a website to respond before giving up (5-120 seconds).</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="maxRetries">Maximum Retries</label>
+                        <input type="number" id="maxRetries" name="max_retries" min="0" max="10" value="{{ settings.max_retries }}" class="form-control">
+                        <small>How many times to retry failed requests (0-10).</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="maxInternalLinks">Max Internal Pages per Domain</label>
+                        <input type="number" id="maxInternalLinks" name="max_internal_links" min="0" max="50" value="{{ settings.max_internal_links }}" class="form-control">
+                        <small>How many internal pages to scrape per domain to find more emails (0-50). Set to 0 to only scrape the homepage.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="urlExclusionPatterns">URL Exclusion Patterns (Wildcard Supported)</label>
+                        <textarea id="urlExclusionPatterns" name="url_exclusion_patterns" rows="4" class="form-control" placeholder="*/blog/*&#10;*/news/*&#10;*/privacy/*&#10;*/terms/*">{{ settings.url_exclusion_patterns|default('', true) }}</textarea>
+                        <small>
+                            One pattern per line or comma-separated. Use <code>*</code> as wildcard.<br>
+                            Examples: <code>*/blog/*</code> (matches any URL with /blog/), <code>/news</code> (matches URLs containing /news), <code>*.pdf</code> (matches PDF files)
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useProxies" name="use_proxies" {{ 'checked' if settings.use_proxies else '' }}>
+                            <span>Use Proxies</span>
+                        </label>
+                        <small>Enable to use your configured proxies for scraping. Make sure you have added proxies first.</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h2>Email Filters</h2>
+                <div>
+                    <button class="btn btn-secondary btn-sm" onclick="seedDefaultFilters()" style="margin-right: 5px;">
+                        <i class="fas fa-magic"></i> Add Missing Defaults
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="showAddFilterModal()">
+                        <i class="fas fa-plus"></i> Add Filter
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="filtersList">
+                    <!-- Email filters will be loaded here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h2>Change Password</h2>
+            </div>
+            <div class="card-body">
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" name="current_password" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" name="new_password" class="form-control" required minlength="6">
+                        <small>Password must be at least 6 characters long.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm New Password</label>
+                        <input type="password" id="confirmPassword" name="confirm_password" class="form-control" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-key"></i> Change Password
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h2>Account Information</h2>
+            </div>
+            <div class="card-body">
+                <div class="info-row">
+                    <span class="info-label">Email:</span>
+                    <span>{{ current_user.email }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Member Since:</span>
+                    <span>{{ current_user.created_at.strftime('%Y-%m-%d') }}</span>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Add Email Filter Modal -->
+<div id="addFilterModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add Email Filter</h2>
+            <span class="close" onclick="closeAddFilterModal()">&times;</span>
+        </div>
+        <form id="addFilterForm">
+            <div class="form-group">
+                <label for="filterPattern">Pattern</label>
+                <input type="text" id="filterPattern" name="pattern" class="form-control" required>
+                <small>Enter the pattern to filter (e.g., .png, .jpg, UUID patterns)</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="filterType">Filter Type</label>
+                <select id="filterType" name="filter_type" class="form-control">
+                    <option value="suffix">Suffix (ends with)</option>
+                    <option value="contains">Contains</option>
+                    <option value="regex">Regular Expression</option>
+                </select>
+                <small>Choose how the pattern should match</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="filterDescription">Description (optional)</label>
+                <input type="text" id="filterDescription" name="description" class="form-control">
+                <small>Brief description of what this filter does</small>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Filter
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

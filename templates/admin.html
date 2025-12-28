@@ -1,0 +1,834 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Email Scraper{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    {% include '_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="page-header">
+            <div>
+                <h1><i class="fas fa-shield-alt"></i> Admin Panel</h1>
+                <p>Complete system management and monitoring</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-success" onclick="approveAllPending()">
+                    <i class="fas fa-check-double"></i> Approve All Pending
+                </button>
+                <button class="btn btn-warning" onclick="recoverStuckProjects()">
+                    <i class="fas fa-first-aid"></i> Recover Stuck
+                </button>
+            </div>
+        </div>
+
+        <!-- System Health Cards -->
+        <div class="health-grid" id="healthGrid">
+            <div class="health-card health-status" id="dbHealth">
+                <div class="health-icon"><i class="fas fa-database"></i></div>
+                <div class="health-info">
+                    <span class="health-label">Database</span>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+            <div class="health-card health-status" id="redisHealth">
+                <div class="health-icon"><i class="fas fa-memory"></i></div>
+                <div class="health-info">
+                    <span class="health-label">Redis</span>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+            <div class="health-card health-status" id="workersHealth">
+                <div class="health-icon"><i class="fas fa-cogs"></i></div>
+                <div class="health-info">
+                    <span class="health-label">Workers</span>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+            <div class="health-card health-status" id="systemHealth">
+                <div class="health-icon"><i class="fas fa-server"></i></div>
+                <div class="health-info">
+                    <span class="health-label">System</span>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-icon users"><i class="fas fa-users"></i></div>
+                <div class="stat-content">
+                    <p class="stat-label">Total Users</p>
+                    <h3 class="stat-value" id="totalUsers">-</h3>
+                    <small id="pendingBadge" class="pending-badge" style="display:none;">0 pending</small>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon projects"><i class="fas fa-folder-open"></i></div>
+                <div class="stat-content">
+                    <p class="stat-label">Total Projects</p>
+                    <h3 class="stat-value" id="totalProjects">-</h3>
+                    <small id="runningBadge" class="running-badge" style="display:none;">0 running</small>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon emails"><i class="fas fa-envelope"></i></div>
+                <div class="stat-content">
+                    <p class="stat-label">Emails Found</p>
+                    <h3 class="stat-value" id="totalEmails">-</h3>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon urls"><i class="fas fa-link"></i></div>
+                <div class="stat-content">
+                    <p class="stat-label">URLs Processed</p>
+                    <h3 class="stat-value" id="processedUrls">-</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="admin-tabs">
+            <button class="admin-tab active" onclick="switchTab('users')">
+                <i class="fas fa-users"></i> Users
+            </button>
+            <button class="admin-tab" onclick="switchTab('projects')">
+                <i class="fas fa-folder"></i> Projects
+            </button>
+            <button class="admin-tab" onclick="switchTab('system')">
+                <i class="fas fa-server"></i> System
+            </button>
+            <button class="admin-tab" onclick="switchTab('queues')">
+                <i class="fas fa-tasks"></i> Queues
+            </button>
+        </div>
+
+        <!-- Tab Content: Users -->
+        <div id="usersTab" class="tab-panel active">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-users"></i> User Management</h3>
+                    <div class="filters">
+                        <input type="text" id="searchInput" placeholder="Search users..." class="search-input">
+                        <select id="statusFilter" class="filter-select">
+                            <option value="all">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="active">Active</option>
+                            <option value="blocked">Blocked</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Role</th>
+                                <th>Projects</th>
+                                <th>Emails</th>
+                                <th>Created</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr><td colspan="8" class="loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="userPagination"></div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Projects -->
+        <div id="projectsTab" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-folder"></i> All Projects</h3>
+                    <div class="filters">
+                        <input type="text" id="projectSearch" placeholder="Search projects..." class="search-input">
+                        <select id="projectStatusFilter" class="filter-select">
+                            <option value="all">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="running">Running</option>
+                            <option value="completed">Completed</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Owner</th>
+                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>URLs</th>
+                                <th>Emails</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projectsTableBody">
+                            <tr><td colspan="8" class="loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="projectPagination"></div>
+            </div>
+        </div>
+
+        <!-- Tab Content: System -->
+        <div id="systemTab" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-heartbeat"></i> System Health & Monitoring</h3>
+                    <span class="live-indicator"><i class="fas fa-circle"></i> Live</span>
+                </div>
+                <div class="card-body" id="systemDetails">
+                    <div class="system-section">
+                        <h4><i class="fas fa-server"></i> Server Resources</h4>
+                        <div class="resource-bars">
+                            <div class="resource-item">
+                                <div class="resource-header">
+                                    <span>CPU Usage</span>
+                                    <span id="cpuPercent">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="cpuBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="resource-item">
+                                <div class="resource-header">
+                                    <span>Memory Usage</span>
+                                    <span id="memoryPercent">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="memoryBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="resource-item">
+                                <div class="resource-header">
+                                    <span>Disk Usage</span>
+                                    <span id="diskPercent">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="diskBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="system-section">
+                        <h4><i class="fas fa-database"></i> Database</h4>
+                        <div class="status-row">
+                            <span>Status:</span>
+                            <span id="dbStatus" class="health-ok">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div class="system-section">
+                        <h4><i class="fas fa-bolt"></i> Redis</h4>
+                        <div class="status-row">
+                            <span>Status:</span>
+                            <span id="redisStatus" class="health-ok">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div class="system-section">
+                        <h4><i class="fas fa-cogs"></i> Celery Workers</h4>
+                        <div class="status-row">
+                            <span>Active Workers:</span>
+                            <span id="workerCount">0</span>
+                        </div>
+                        <div class="status-row">
+                            <span>Status:</span>
+                            <span id="workerStatus">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div class="system-section">
+                        <h4><i class="fas fa-folder-open"></i> Projects</h4>
+                        <div class="status-row">
+                            <span>Running:</span>
+                            <span id="runningProjects">0</span>
+                        </div>
+                        <div class="status-row">
+                            <span>Paused:</span>
+                            <span id="pausedProjects">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Queues -->
+        <div id="queuesTab" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-tasks"></i> Queue Management</h3>
+                    <span class="live-indicator"><i class="fas fa-circle"></i> Live</span>
+                </div>
+                <div class="card-body" id="queueDetails">
+                    <div class="queue-section">
+                        <h4><i class="fas fa-list"></i> Task Queues</h4>
+                        <div class="queue-item">
+                            <div class="queue-info">
+                                <span class="queue-name">Scrape Queue</span>
+                                <span class="queue-count" id="scrapeQueueCount">0 tasks pending</span>
+                            </div>
+                            <button class="action-btn btn-delete" onclick="clearQueue('scrape')" title="Clear Queue">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                        </div>
+                        <div class="queue-item">
+                            <div class="queue-info">
+                                <span class="queue-name">High Priority Queue</span>
+                                <span class="queue-count" id="scrapeHighQueueCount">0 tasks pending</span>
+                            </div>
+                            <button class="action-btn btn-delete" onclick="clearQueue('scrape_high')" title="Clear Queue">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                        </div>
+                        <div class="queue-item">
+                            <div class="queue-info">
+                                <span class="queue-name">Operations Queue</span>
+                                <span class="queue-count" id="opsQueueCount">0 tasks pending</span>
+                            </div>
+                            <button class="action-btn btn-delete" onclick="clearQueue('ops')" title="Clear Queue">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="queue-section">
+                        <h4><i class="fas fa-folder-open"></i> Running Projects</h4>
+                        <div class="status-row">
+                            <span>Currently Running:</span>
+                            <span id="queueRunningProjects">0</span>
+                        </div>
+                        <div class="status-row">
+                            <span>Paused:</span>
+                            <span id="queuePausedProjects">0</span>
+                        </div>
+                    </div>
+
+                    <div class="queue-section">
+                        <h4><i class="fas fa-tools"></i> Queue Actions</h4>
+                        <div class="queue-actions">
+                            <button class="btn btn-warning" onclick="clearQueue('all')">
+                                <i class="fas fa-broom"></i> Clear All Queues
+                            </button>
+                            <button class="btn btn-primary" onclick="recoverStuckProjects()">
+                                <i class="fas fa-wrench"></i> Recover Stuck Projects
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- User Details Modal -->
+<div id="userDetailsModal" class="modal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h2><i class="fas fa-user"></i> User Details</h2>
+            <span class="modal-close" onclick="closeUserDetailsModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="userDetailsContent">
+            <div class="loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Health Cards */
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.health-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border-left: 4px solid #ddd;
+}
+
+.health-card.healthy { border-left-color: #28a745; }
+.health-card.unhealthy { border-left-color: #dc3545; }
+.health-card.warning { border-left-color: #ffc107; }
+
+.health-icon {
+    font-size: 24px;
+    color: #666;
+}
+
+.health-info { flex: 1; }
+.health-label { font-size: 12px; color: #888; display: block; }
+.health-status { font-weight: 600; }
+.health-status.healthy { color: #28a745; }
+.health-status.unhealthy { color: #dc3545; }
+.health-status.warning { color: #ffc107; }
+.health-status.loading { color: #888; }
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+}
+
+.stat-icon.users { background: linear-gradient(135deg, #667eea, #764ba2); }
+.stat-icon.projects { background: linear-gradient(135deg, #f093fb, #f5576c); }
+.stat-icon.emails { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+.stat-icon.urls { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+.stat-content { flex: 1; }
+.stat-label { color: #888; font-size: 13px; margin: 0; }
+.stat-value { font-size: 28px; font-weight: 700; margin: 5px 0; color: #333; }
+
+.pending-badge, .running-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.pending-badge { background: #fff3cd; color: #856404; }
+.running-badge { background: #cce5ff; color: #004085; }
+
+/* Tabs */
+.admin-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 0;
+}
+
+.admin-tab {
+    padding: 12px 25px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.admin-tab:hover { color: #333; background: #f8f9fa; }
+.admin-tab.active { color: #667eea; border-bottom-color: #667eea; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Filters */
+.filters {
+    display: flex;
+    gap: 10px;
+}
+
+.search-input, .filter-select {
+    padding: 8px 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.search-input { width: 250px; }
+
+/* Table */
+.table-responsive { overflow-x: auto; }
+.loading-cell { text-align: center; padding: 40px; color: #888; }
+
+/* Status Badges */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-pending { background: #fff3cd; color: #856404; }
+.status-active { background: #d4edda; color: #155724; }
+.status-blocked { background: #f8d7da; color: #721c24; }
+.status-suspended { background: #ffe5d0; color: #8a4500; }
+.status-running { background: #cce5ff; color: #004085; }
+.status-completed { background: #d4edda; color: #155724; }
+.status-error { background: #f8d7da; color: #721c24; }
+
+.role-badge {
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.role-admin { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+.role-user { background: #e9ecef; color: #495057; }
+
+/* Action Buttons */
+.action-btns {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+
+.btn-approve { background: #28a745; color: white; }
+.btn-block { background: #dc3545; color: white; }
+.btn-suspend { background: #ffc107; color: #000; }
+.btn-view { background: #17a2b8; color: white; }
+.btn-delete { background: #dc3545; color: white; }
+.btn-pause { background: #ffc107; color: #000; }
+.btn-resume { background: #28a745; color: white; }
+.btn-reset { background: #6c757d; color: white; }
+
+.action-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+/* System Grid */
+.system-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.resource-bars { display: flex; flex-direction: column; gap: 20px; }
+.resource-item { }
+.resource-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+.resource-header span:last-child { font-weight: 600; }
+
+/* Live indicator */
+.live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #28a745;
+    font-weight: 500;
+}
+.live-indicator i {
+    font-size: 8px;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.stats-section { margin-bottom: 25px; }
+.stats-section h4 { margin-bottom: 12px; color: #333; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.stat-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+
+/* Queue Cards */
+.queue-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.queue-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+}
+
+.queue-header {
+    margin-bottom: 15px;
+}
+
+.queue-header i { font-size: 24px; color: #667eea; }
+.queue-header h4 { margin: 10px 0 0; font-size: 16px; }
+
+.queue-stats { display: flex; justify-content: center; gap: 30px; margin-bottom: 15px; }
+.queue-stat { text-align: center; }
+.queue-count { display: block; font-size: 28px; font-weight: 700; color: #333; }
+.queue-label { font-size: 12px; color: #888; }
+
+/* Modal */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+.modal-content { background: white; margin: 5% auto; width: 90%; max-width: 800px; border-radius: 12px; overflow: hidden; }
+.modal-lg { max-width: 900px; }
+.modal-header { padding: 20px; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { margin: 0; font-size: 18px; }
+.modal-close { font-size: 28px; cursor: pointer; color: #666; }
+.modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
+
+.header-actions { display: flex; gap: 10px; }
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 20px;
+}
+
+.pagination button {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.pagination button:hover { background: #f8f9fa; }
+.pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Toast Notifications */
+.toast {
+    background: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease;
+}
+
+.toast-success { border-left: 4px solid #28a745; }
+.toast-success i { color: #28a745; }
+.toast-error { border-left: 4px solid #dc3545; }
+.toast-error i { color: #dc3545; }
+
+.toast-fade {
+    animation: slideOut 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+/* Health Status Colors */
+.health-ok { border-left-color: #28a745 !important; }
+.health-ok .status-text { color: #28a745; font-weight: 600; }
+.health-warning { border-left-color: #ffc107 !important; }
+.health-warning .status-text { color: #856404; font-weight: 600; }
+.health-error { border-left-color: #dc3545 !important; }
+.health-error .status-text { color: #dc3545; font-weight: 600; }
+
+.status-text { font-weight: 500; color: #666; }
+
+/* Progress bar colors */
+.bg-success { background: linear-gradient(90deg, #28a745, #20c997) !important; }
+.bg-warning { background: linear-gradient(90deg, #ffc107, #fd7e14) !important; }
+.bg-danger { background: linear-gradient(90deg, #dc3545, #bd2130) !important; }
+
+/* User Details Modal Grid */
+.user-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.user-detail-header h3 { margin: 0; }
+
+.user-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.detail-item label {
+    display: block;
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 4px;
+}
+
+.detail-item span {
+    font-size: 15px;
+    font-weight: 500;
+    color: #333;
+}
+
+/* Progress bar in table */
+.progress-bar-container {
+    position: relative;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    min-width: 100px;
+}
+
+.progress-bar-container .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    transition: width 0.5s ease, background 0.5s ease;
+}
+
+.progress-bar-container .progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* System details sections */
+.system-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.system-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.system-section h4 {
+    margin: 0 0 15px;
+    font-size: 14px;
+    color: #333;
+}
+
+.system-section h4 i {
+    margin-right: 8px;
+    color: #667eea;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 14px;
+}
+
+.workers-list {
+    margin-top: 10px;
+}
+
+.worker-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 5px;
+}
+
+.worker-name { font-family: monospace; font-size: 13px; }
+
+/* Queue Actions */
+.queue-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.queue-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.queue-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.queue-name { font-weight: 600; }
+.queue-count { color: #888; font-size: 13px; }
+
+.queue-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+.queue-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+.queue-section h4 {
+    margin: 0 0 15px;
+    font-size: 14px;
+    color: #333;
+}
+.queue-section h4 i {
+    margin-right: 8px;
+    color: #667eea;
+}
+
+@media (max-width: 1200px) {
+    .health-grid, .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .system-grid { grid-template-columns: 1fr; }
+    .queue-grid { grid-template-columns: 1fr; }
+    .user-detail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

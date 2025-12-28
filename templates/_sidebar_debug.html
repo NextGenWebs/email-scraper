@@ -1,0 +1,63 @@
+<!-- DEBUG SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <i class="fas fa-envelope-open-text"></i>
+        <h3>Email Scraper</h3>
+    </div>
+    
+    <!-- DEBUG INFO -->
+    <div style="background: #ff0000; color: white; padding: 10px; margin: 10px; font-size: 11px;">
+        <strong>DEBUG:</strong><br>
+        Authenticated: {{ current_user.is_authenticated }}<br>
+        {% if current_user.is_authenticated %}
+        Email: {{ current_user.email }}<br>
+        is_admin attr exists: {{ current_user.is_admin is defined }}<br>
+        is_admin value: {{ current_user.is_admin }}
+        {% endif %}
+    </div>
+    
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('views.dashboard') }}" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('views.projects') }}" class="nav-item {% if active_page == 'projects' %}active{% endif %}">
+            <i class="fas fa-folder"></i>
+            <span>Projects</span>
+        </a>
+        <a href="{{ url_for('views.proxies') }}" class="nav-item {% if active_page == 'proxies' %}active{% endif %}">
+            <i class="fas fa-server"></i>
+            <span>Proxies</span>
+        </a>
+        <a href="{{ url_for('views.settings') }}" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
+        </a>
+        
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <hr style="margin: 10px 15px; border-color: rgba(255,255,255,0.1);">
+        <a href="{{ url_for('admin.admin_panel') }}" class="nav-item {% if active_page == 'admin' %}active{% endif %}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <i class="fas fa-shield-alt"></i>
+            <span>Admin Panel</span>
+        </a>
+        {% endif %}
+    </nav>
+    
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <i class="fas fa-user-circle"></i>
+            <div>
+                <span style="display: block;">{{ current_user.email }}</span>
+                {% if current_user.is_authenticated and current_user.is_admin %}
+                <small style="color: #ffd700; font-size: 11px;">
+                    <i class="fas fa-crown"></i> Admin
+                </small>
+                {% endif %}
+            </div>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="logout-btn">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
+        </a>
+    </div>
+</aside>
